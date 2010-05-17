@@ -1,0 +1,272 @@
+#!/usr/bin/python
+"""
+Retrieve PubMed reference from its PMID given in function
+Copyright (C) 2010 Tamas Nepusz
+
+Based on the excellent pyP2B by Jean-Etienne Poirrier.
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+"""
+
+__author__ = "Tamas Nepusz"
+__email__ = "ntamas@gmail.com"
+__license__ = "GPL"
+
+from cStringIO import StringIO
+from itertools import izip
+from lxml import etree
+from textwrap import dedent
+from urllib import quote
+
+import logging
+import optparse
+import re
+import sys
+import urllib2
+
+# pylint: disable-msg=R0903
+# R0903: too few public methods
+class BibTeXReference(object):
+    """Class representing a BibTeX reference.
+    
+    This class supports the Python dictionary protocol, so you can do
+    things like this::
+        
+        >>> ref = BibTeXReference("article", "Nepusz10")
+        >>> ref["author"] = "Nepusz, T. and Sasidharan, R. and Paccanaro, P."
+        >>> ref["title"] = "SCPS: a fast implementation of a spectral method"+
+                     " for detecting protein families on a genome-wide scale"
+        >>> ref["journal"] = "BMC Bioinformatics"
+        >>> ref["volume"] = 11
+        >>> ref["pages"] = 120
+        >>> ref["year"] = 2010
+        >>> ref = str(ref)
+
+    Converting an instance of this class to a string yields a properly
+    formatted BibTeX representation of the reference.
+    """
+
+    def __init__(self, entry_type, bibtex_id):
+        """Constructs a new BibTeX reference with the given entry type
+        and the given BibTeX entry ID."""
+        self._data = {}
+        self.entry_type = str(entry_type)
+        self.bibtex_id = str(bibtex_id)
+        self.indentation = "  "
+
+    def __getitem__(self, item):
+        return self._data[item]
+
+    def __setitem__(self, item, value):
+        self._data[item] = value
+
+    def __delitem__(self, item):
+        del self._data[item]
+
+    def __len__(self):
+        return len(self._data)
+
+    def __str__(self):
+        """Creates a nicely formatted string representation of
+        this BibTeX reference in ``.bib`` format.
+        """
+        lines = []
+        for key in sorted(self._data.iterkeys()):
+            value = self._format_bibtex_value(key)
+            lines.append("%s%s = %s," % (self.indentation, key, value))
+        if lines:
+            lines[-1] = lines[-1][0:-1]    # strip the last comma
+        lines = "\n".join(lines)
+        return "@%s{%s,\n%s\n}" % (self.entry_type, self.bibtex_id, lines)
+
+    def _format_bibtex_value(self, key):
+        """Formats the current value of the given `key` in the internal
+        data dictionary so it can be used in the BibTeX output"""
+        value = self._data[key]
+
+        try:
+            # If value is an integer, return it as is
+            value = int(value)
+            return str(value)
+        except ValueError:
+            pass
+
+        # Surround value with parentheses. In the "title" field, ensure
+        # that capital letters are kept
+        value = "{%s}" % value
+        if key.lower() == "title":
+            value = re.sub("([A-Z]+)", r"{\1}", value)
+
+        return value
+
+
+class InvalidPubMedIDError(Exception):
+    """Exception thrown for invalid PubMed IDs"""
+
+    def __init__(self, pmid):
+        super(InvalidPubMedIDError, self).__init__()
+        self.pmid = pmid
+
+    def __str__(self):
+        return "PubMed ID not found: %s" % self.pmid
+
+
+class PM2BibApplication(object):
+    """\
+    Usage: %prog pmid [pmid] [pmid]...
+    
+    Retrieves the given entries from PubMed, converts them to BibTeX format
+    and prints them to the standard output.
+    """
+
+    def __init__(self):
+        usage = dedent(self.__class__.__doc__).strip()
+        self.parser = optparse.OptionParser(usage=usage)
+        self.log = logging.getLogger("pm2bib")
+        self.log.setLevel(logging.WARNING)
+        logging.basicConfig(format="%(message)s", level=logging.DEBUG)
+
+    def run(self):
+        """Runs the main application"""
+        _, args = self.parser.parse_args()
+
+        if not args:
+            self.parser.print_help()
+            return 1
+
+        success = True
+        for arg in args:
+            try:
+                print self.get_pubmed_reference(arg)
+            except InvalidPubMedIDError as ex:
+                self.log.error(str(ex))
+				success = False
+
+        return 0 if success else 1
+
+    # pylint: disable-msg=R0201,R0914
+    # R0201: method could be a function
+    # R0914: too many local variables
+    def get_pubmed_reference(self, pubmed_uid):
+        """Returns a `BibTeXReference` representation of the reference with the
+        given PubMed ID. Raises ``KeyError`` for invalid PubMed IDs.
+        """
+
+        query_string = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils"\
+                       "/efetch.fcgi?&db=pubmed&id=%s&retmode=xml&"\
+                       "rettype=medline" % quote(str(pubmed_uid))
+
+        # Getting data from PubMed ...
+        result = urllib2.urlopen(query_string)
+
+        # Processing file (because it was plain HTML, not text)
+        lines = []
+        for line in result:
+            line = line.replace('<pre>', '')
+            line = line.replace('</pre>', '')
+            line = line.replace('&lt;', '<')
+            line = line.replace('&gt;', '>')
+            line = line.replace('&quot;', '"')
+            lines.append(line.strip())
+
+        # Verification if it's a correct reference ...
+        if not any(line.endswith('</PubmedArticleSet>') for line in lines):
+            raise InvalidPubMedIDError(pubmed_uid)
+
+        # Opening it with lxml and XPath
+        tree = etree.parse(StringIO("\n".join(lines)))
+
+        # get authors
+        def xpath(path):
+            """Shorthand notation for constructing an XPath expression
+            in the document tree"""
+            return tree.xpath('/PubmedArticleSet/PubmedArticle'\
+                   '/%s' % path)
+
+        authors = ""
+        authl = xpath('/MedlineCitation/Article/AuthorList/Author/LastName')
+        authi = xpath('/MedlineCitation/Article/AuthorList/Author/Initials')
+        authors = []
+        for lastname_elt, initials_elt in izip(authl, authi):
+            lastname = lastname_elt.text.encode("utf-8")
+            initials = "".join("%s." % char for char in initials_elt.text)
+            authors.append("%s, %s" % (lastname, initials))
+        authors = " and ".join(authors)
+
+        # get title
+        title = xpath('/MedlineCitation/Article/ArticleTitle')[0].text
+        title = title.strip().capitalize()
+        if title.endswith("."):
+            title = title[0:-1]
+
+        # get year
+        year = xpath('/MedlineCitation/Article/Journal/JournalIssue/PubDate'\
+                     '/Year')
+        year = year[0].text
+
+        # build id (first author's last name + two last year digit)
+        bibtex_id = authl[0].text.lower() + year[-2:]
+
+        # get journal
+        journal = xpath('/MedlineCitation/Article/Journal/Title')[0].text
+        if journal.endswith(" [electronic resource]"):
+            journal = journal[0:-22]
+
+        # get volume
+        volume = xpath('/MedlineCitation/Article/Journal/JournalIssue/Volume')
+        volume = volume[0].text
+
+        # get issue (if exists)
+        issue = xpath('/MedlineCitation/Article/Journal/JournalIssue/Issue')
+        if len(issue) > 0:
+            issue = issue[0].text
+        else:
+            issue = None
+
+        # get pages
+        pages = xpath('/MedlineCitation/Article/Pagination/MedlinePgn')
+        pages = pages[0].text.replace("-", "--")
+
+        # get PMID
+        pmid = xpath('/MedlineCitation/PMID')
+        pmid = pmid[0].text
+
+        # get doi (if exists)
+        idlist = tree.xpath('/PubmedData/ArticleIdList/ArticleId')
+        doi = None
+        for entry in idlist:
+            if str(entry.attrib['IdType'])== 'doi':
+                doi = entry.text
+
+        # Now construct output
+        result = BibTeXReference("article", bibtex_id)
+        result["author"] = authors
+        result["title"] = title
+        result["year"] = year
+        result["journal"] = journal
+        result["volume"] = volume
+        if issue is not None:
+            result["number"] = issue
+        result["pages"] = pages
+        result["pmid"] = pmid
+        if doi is not None:
+            result["doi"] = doi
+
+        return result
+
+
+if __name__ == "__main__":
+    sys.exit(PM2BibApplication().run())
+
