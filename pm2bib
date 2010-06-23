@@ -104,10 +104,10 @@ class BibTeXReference(object):
             pass
 
         # Surround value with parentheses. In the "title" field, ensure
-        # that capital letters are kept
-        value = "{%s}" % value
+        # that capital letters are kept. The first letter is left alone.
         if key.lower() == "title":
-            value = re.sub("([A-Z]+)", r"{\1}", value)
+			value = re.sub("(.)([A-Z]+)", r"\1{\2}", value)
+        value = "{%s}" % value
 
         return value
 
@@ -152,7 +152,7 @@ class PM2BibApplication(object):
                 print self.get_pubmed_reference(arg)
             except InvalidPubMedIDError as ex:
                 self.log.error(str(ex))
-				success = False
+                success = False
 
         return 0 if success else 1
 
@@ -207,7 +207,7 @@ class PM2BibApplication(object):
 
         # get title
         title = xpath('/MedlineCitation/Article/ArticleTitle')[0].text
-        title = title.strip().capitalize()
+        title = title.strip()
         if title.endswith("."):
             title = title[0:-1]
 
