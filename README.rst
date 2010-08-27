@@ -44,11 +44,11 @@ The following command line options are supported:
     specifies the format of the journal title. Currently the following
     formats are supported:
 
-      - ``full``: the full journal title (e.g., *Biochemical Society
-        Transactions*)
-      - ``abbrev``: the abbreviated journal title (e.g., *BIochem Soc
-        Trans*)
-      - ``iso``: the ISO journal title (e.g., *Biochem. Soc. Trans.*)
+    - ``full``: the full journal title (e.g., *Biochemical Society
+      Transactions*)
+    - ``abbrev``: the abbreviated journal title (e.g., *BIochem Soc
+      Trans*)
+    - ``iso``: the ISO journal title (e.g., *Biochem. Soc. Trans.*)
 
 Bugs
 ----
