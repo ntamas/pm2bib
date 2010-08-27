@@ -106,7 +106,7 @@ class BibTeXReference(object):
         # Surround value with parentheses. In the "title" field, ensure
         # that capital letters are kept. The first letter is left alone.
         if key.lower() == "title":
-			value = re.sub("(.)([A-Z]+)", r"\1{\2}", value)
+            value = re.sub("(.)([A-Z]+)", r"\1{\2}", value)
         value = "{%s}" % value
 
         return value
@@ -134,13 +134,19 @@ class PM2BibApplication(object):
     def __init__(self):
         usage = dedent(self.__class__.__doc__).strip()
         self.parser = optparse.OptionParser(usage=usage)
+        self.parser.add_option("-j", "--journal-title",
+				dest="journal_title_format", metavar="FORMAT",
+                default="full", choices=("full", "abbrev", "iso"),
+                help="use the given title FORMAT (full, abbrev or iso)"
+		)
         self.log = logging.getLogger("pm2bib")
         self.log.setLevel(logging.WARNING)
         logging.basicConfig(format="%(message)s", level=logging.DEBUG)
+        self.options = None
 
     def run(self):
         """Runs the main application"""
-        _, args = self.parser.parse_args()
+        self.options, args = self.parser.parse_args()
 
         if not args:
             self.parser.print_help()
@@ -220,7 +226,13 @@ class PM2BibApplication(object):
         bibtex_id = authl[0].text.lower() + year[-2:]
 
         # get journal
-        journal = xpath('/MedlineCitation/Article/Journal/Title')[0].text
+        if self.options.journal_title_format == "iso":
+            path = '/MedlineCitation/Article/Journal/ISOAbbreviation'
+        elif self.options.journal_title_format == "abbrev":
+            path = '/MedlineCitation/MedlineJournalInfo/MedlineTA'
+        else:
+            path = '/MedlineCitation/Article/Journal/Title'
+        journal = xpath(path)[0].text
         if journal.endswith(" [electronic resource]"):
             journal = journal[0:-22]
 

@@ -35,6 +35,21 @@ want to import a paper into your bibliography, open up ``biblio.bib``
 in ``vim`` and type ``:r! pm2bib 20214776`` to insert the output of
 ``pm2bib`` directly into the current buffer.
 
+Command line options
+--------------------
+
+The following command line options are supported:
+
+-j FORMAT, --journal-title FORMAT
+    specifies the format of the journal title. Currently the following
+    formats are supported:
+
+      - ``full``: the full journal title (e.g., *Biochemical Society
+        Transactions*)
+      - ``abbrev``: the abbreviated journal title (e.g., *BIochem Soc
+        Trans*)
+      - ``iso``: the ISO journal title (e.g., *Biochem. Soc. Trans.*)
+
 Bugs
 ----
 
