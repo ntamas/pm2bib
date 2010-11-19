@@ -1,6 +1,7 @@
 #!/usr/bin/python
 """
-Retrieve PubMed reference from its PMID given in function
+Retrieve PubMed reference from its PMID.
+
 Copyright (C) 2010 Tamas Nepusz
 
 Based on the excellent pyP2B by Jean-Etienne Poirrier.
@@ -35,6 +36,22 @@ import optparse
 import re
 import sys
 import urllib2
+import unicodedata
+
+
+try:
+	from unidecode import unidecode
+except ImportError:
+	# No unidecode module, provide a simple replacement
+	def strip_accents(s):
+		"""Strips accents from a Unicode string."""
+		nkfd_form = unicodedata.normalize("NFKD", unicode(s))
+		return ''.join(c for c in nkfd_form
+				       if not unicodedata.combining(c))
+
+	def unidecode(s):
+		return strip_accents(s)
+
 
 # pylint: disable-msg=R0903
 # R0903: too few public methods
@@ -223,7 +240,7 @@ class PM2BibApplication(object):
         year = year[0].text
 
         # build id (first author's last name + two last year digit)
-        bibtex_id = authl[0].text.lower() + year[-2:]
+        bibtex_id = strip_accents(authl[0].text.lower()) + year[-2:]
 
         # get journal
         if self.options.journal_title_format == "iso":
