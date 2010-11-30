@@ -21,36 +21,53 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 """
 
+from __future__ import print_function
+
 __author__ = "Tamas Nepusz"
 __email__ = "ntamas@gmail.com"
 __license__ = "GPL"
 
-from cStringIO import StringIO
-from itertools import izip
+try:
+	# For Python 2.x
+	from cStringIO import StringIO
+	from itertools import izip
+except ImportError:
+	# For Python 3.x
+	from io import StringIO
+	izip = zip
+	unicode = str
+
 from lxml import etree
 from textwrap import dedent
-from urllib import quote
+
+try:
+	# For Python 2.x
+	from urllib import quote
+	from urllib2 import urlopen
+except ImportError:
+	# For Python 3.x
+	from urllib.parse import quote
+	from urllib.request import urlopen
 
 import logging
 import optparse
 import re
 import sys
-import urllib2
 import unicodedata
 
 
 try:
-	from unidecode import unidecode
+    from unidecode import unidecode
 except ImportError:
-	# No unidecode module, provide a simple replacement
-	def strip_accents(s):
-		"""Strips accents from a Unicode string."""
-		nkfd_form = unicodedata.normalize("NFKD", unicode(s))
-		return ''.join(c for c in nkfd_form
-				       if not unicodedata.combining(c))
+    # No unidecode module, provide a simple replacement
+    def strip_accents(s):
+        """Strips accents from a Unicode string."""
+        nkfd_form = unicodedata.normalize("NFKD", unicode(s))
+        return ''.join(c for c in nkfd_form
+                       if not unicodedata.combining(c))
 
-	def unidecode(s):
-		return strip_accents(s)
+    def unidecode(s):
+        return strip_accents(s)
 
 
 # pylint: disable-msg=R0903
@@ -100,7 +117,7 @@ class BibTeXReference(object):
         this BibTeX reference in ``.bib`` format.
         """
         lines = []
-        for key in sorted(self._data.iterkeys()):
+        for key in sorted(self._data.keys()):
             value = self._format_bibtex_value(key)
             lines.append("%s%s = %s," % (self.indentation, key, value))
         if lines:
@@ -152,10 +169,10 @@ class PM2BibApplication(object):
         usage = dedent(self.__class__.__doc__).strip()
         self.parser = optparse.OptionParser(usage=usage)
         self.parser.add_option("-j", "--journal-title",
-				dest="journal_title_format", metavar="FORMAT",
+                dest="journal_title_format", metavar="FORMAT",
                 default="full", choices=("full", "abbrev", "iso"),
                 help="use the given title FORMAT (full, abbrev or iso)"
-		)
+        )
         self.log = logging.getLogger("pm2bib")
         self.log.setLevel(logging.WARNING)
         logging.basicConfig(format="%(message)s", level=logging.DEBUG)
@@ -172,7 +189,7 @@ class PM2BibApplication(object):
         success = True
         for arg in args:
             try:
-                print self.get_pubmed_reference(arg)
+                print(self.get_pubmed_reference(arg))
             except InvalidPubMedIDError as ex:
                 self.log.error(str(ex))
                 success = False
@@ -192,7 +209,7 @@ class PM2BibApplication(object):
                        "rettype=medline" % quote(str(pubmed_uid))
 
         # Getting data from PubMed ...
-        result = urllib2.urlopen(query_string)
+        result = urlopen(query_string)
 
         # Processing file (because it was plain HTML, not text)
         lines = []
