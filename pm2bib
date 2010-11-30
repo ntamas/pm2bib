@@ -28,26 +28,26 @@ __email__ = "ntamas@gmail.com"
 __license__ = "GPL"
 
 try:
-	# For Python 2.x
-	from cStringIO import StringIO
-	from itertools import izip
+    # For Python 2.x
+    from cStringIO import StringIO
+    from itertools import izip
 except ImportError:
-	# For Python 3.x
-	from io import StringIO
-	izip = zip
-	unicode = str
+    # For Python 3.x
+    from io import StringIO
+    izip = zip
+    unicode = str
 
 from lxml import etree
 from textwrap import dedent
 
 try:
-	# For Python 2.x
-	from urllib import quote
-	from urllib2 import urlopen
+    # For Python 2.x
+    from urllib import quote
+    from urllib2 import urlopen
 except ImportError:
-	# For Python 3.x
-	from urllib.parse import quote
-	from urllib.request import urlopen
+    # For Python 3.x
+    from urllib.parse import quote
+    from urllib.request import urlopen
 
 import logging
 import optparse
@@ -206,7 +206,8 @@ class PM2BibApplication(object):
 
         query_string = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils"\
                        "/efetch.fcgi?&db=pubmed&id=%s&retmode=xml&"\
-                       "rettype=medline" % quote(str(pubmed_uid))
+                       "rettype=medline&tool=pm2bib&"\
+					   "email=%s" % (quote(str(pubmed_uid)), __email__)
 
         # Getting data from PubMed ...
         result = urlopen(query_string)
@@ -226,7 +227,7 @@ class PM2BibApplication(object):
             raise InvalidPubMedIDError(pubmed_uid)
 
         # Opening it with lxml and XPath
-        tree = etree.parse(StringIO("\n".join(lines)))
+		tree = etree.parse(StringIO("\n".join(lines)))
 
         # get authors
         def xpath(path):
