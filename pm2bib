@@ -1,4 +1,6 @@
 #!/usr/bin/python
+# vim:set sw=4 ts=4 sts=4 et:
+
 """
 Retrieve PubMed reference from its PMID.
 
@@ -132,8 +134,13 @@ class BibTeXReference(object):
 
         try:
             # If value is an integer, return it as is
-            value = int(value)
-            return str(value)
+            # The only exception is when the value starts with zero;
+            # this happens for some physics journals where the page
+            # number always contains exactly X digits
+            if not isinstance(value, basestring) or not value \
+                    or value[0] != "0":
+                value = int(value)
+                return str(value)
         except ValueError:
             pass
 
