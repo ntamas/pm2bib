@@ -207,7 +207,7 @@ class PM2BibApplication(object):
         query_string = "http://eutils.ncbi.nlm.nih.gov/entrez/eutils"\
                        "/efetch.fcgi?&db=pubmed&id=%s&retmode=xml&"\
                        "rettype=medline&tool=pm2bib&"\
-					   "email=%s" % (quote(str(pubmed_uid)), __email__)
+                       "email=%s" % (quote(str(pubmed_uid)), __email__)
 
         # Getting data from PubMed ...
         result = urlopen(query_string)
@@ -227,7 +227,7 @@ class PM2BibApplication(object):
             raise InvalidPubMedIDError(pubmed_uid)
 
         # Opening it with lxml and XPath
-		tree = etree.parse(StringIO("\n".join(lines)))
+        tree = etree.parse(StringIO("\n".join(lines)))
 
         # get authors
         def xpath(path):
